@@ -14,14 +14,11 @@ packages:
     - ./ihaskell-display/ihaskell-plot
     - ./ihaskell-display/ihaskell-static-canvas
     - ./ihaskell-display/ihaskell-widgets
-    - location:
-        git: https://github.com/amcphail/plot.git
-        commit: cc5cdff696aa99e1001124917c3b87b95529c4e3
-      extra-dep: true
-resolver: nightly-2017-11-28
-allow-newer: true
-extra-deps:
-- static-canvas-0.2.0.3
+resolver: lts-9.21
+extra-deps: []
+flags:
+  ihaskell:
+    binpkgdb: false
 
 nix:
   enable: false
@@ -30,6 +27,7 @@ nix:
     - cairo
     - file
     - gcc
+    - gfortran.cc.lib
     - liblapack
     - ncurses
     - pango

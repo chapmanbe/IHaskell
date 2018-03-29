@@ -1,6 +1,12 @@
-{ compiler ? "ghc802", nixpkgs ? import <nixpkgs> {}, packages ? (_: []), rtsopts ? "-M3g -N2", systemPackages ? (_: []) }:
+{ nixpkgs_ ? import <nixpkgs> {}, packages ? (_: []), rtsopts ? "-M3g -N2", systemPackages ? (_: []) }:
 
 let
+  nixpkgs = import (nixpkgs_.fetchFromGitHub {
+    owner  = "NixOS";
+    repo   = "nixpkgs";
+    rev    = "d843d7f21a66ba0a2f6517428815dc298ab14cb1";
+    sha256 = "1h9lxv0768kg4sgkbcnzpfgsa928rxxzlbxfbl9psjaq20c2a6y1";
+  }) {};
   inherit (builtins) any elem filterSource listToAttrs;
   lib = nixpkgs.lib;
   cleanSource = name: type: let
@@ -18,7 +24,7 @@ let
   ipython-kernel-src   = filterSource cleanSource ./ipython-kernel;
   ghc-parser-src       = filterSource cleanSource ./ghc-parser;
   ihaskell-display-src = filterSource cleanSource ./ihaskell-display;
-  displays = self: listToAttrs (
+  displays = self: builtins.listToAttrs (
     map
       (display: { name = display; value = self.callCabal2nix display "${ihaskell-display-src}/${display}" {}; })
       [
@@ -35,7 +41,7 @@ let
         "ihaskell-static-canvas"
         "ihaskell-widgets"
       ]);
-  haskellPackages = nixpkgs.haskell.packages."${compiler}".override {
+  haskellPackages = nixpkgs.haskell.packages.ghc841.override {
     overrides = self: super: {
       ihaskell          = nixpkgs.haskell.lib.overrideCabal (
                           self.callCabal2nix "ihaskell" ihaskell-src {}) (_drv: {
@@ -48,13 +54,7 @@ let
       ghc-parser        = self.callCabal2nix "ghc-parser" ghc-parser-src {};
       ipython-kernel    = self.callCabal2nix "ipython-kernel" ipython-kernel-src {};
 
-      haskell-src-exts  = self.haskell-src-exts_1_20_1;
-      haskell-src-meta  = self.haskell-src-meta_0_8_0_2;
-      hmatrix           = self.hmatrix_0_18_2_0;
-
-      shelly            = nixpkgs.haskell.lib.doJailbreak super.shelly;
-      static-canvas     = nixpkgs.haskell.lib.doJailbreak super.static-canvas;
-
+      hlint             = super.hlint.overrideScope (_self: _super: { haskell-src-exts = self.haskell-src-exts; });
     } // displays self;
   };
   ihaskellEnv = haskellPackages.ghcWithPackages (self: [ self.ihaskell ] ++ packages self);

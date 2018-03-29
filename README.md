@@ -81,6 +81,29 @@ Currently the component that takes the longest time to compile is
 `ihaskell-widgets`, so if you're in a hurry you may want to comment that out in
 `stack.yaml`.
 
+## Stack development with Docker
+This is an alternative way to use Docker than above, taking advantage of stack's Docker support.
+Makes it easy to install new packages with `stack --docker install <pkg>` without having to rebuild a docker image.
+Like the other Docker workflow, this doesn't require any host dependecies to be installed.
+
+```bash
+docker build -t ihaskell-dev docker
+stack --docker setup
+stack --docker install
+stack --docker exec ihaskell -- install --stack
+stack --docker exec jupyter -- notebook --ip=0.0.0.0 notebooks
+```
+
+Everything in the LTS can be made available!
+To add a package outside the LTS, simply add it to the `stack.yaml` file  (See: "Where are my packages?" below).
+Then install the package with stack before restarting `jupyter`
+
+```bash
+# after adding details about mypackage to stack.yaml
+stack --docker install mypackage
+stack --docker exec jupyter -- notebook notebooks
+```
+
 ## Nix
 
 If you have the `nix` package manager installed, you can create an IHaskell
@@ -94,7 +117,9 @@ $ <result path>/bin/ihaskell-notebook
 
 It might take a while the first time, but subsequent builds will be much faster.
 
-## Where are my packages?
+# Troubleshooting
+
+## Where are my packages? (IHaskell + Stack)
 
 Stack manages separate environments for every package. By default your notebooks
 will only have access to a few packages that happen to be required for
@@ -120,3 +145,12 @@ name even if it's local.
     hg: https://example.com/hg/repo
     commit: da39a3ee5e6b4b0d3255bfef95601890afd80709
 ```
+
+## The kernel keeps dying (IHaskell + Stack)
+
+The default instructions globally install IHaskell with support for only one
+version of GHC. If you've e.g. installed an `lts-10` IHaskell and are using it
+with an `lts-9` project the mismatch between GHC 8.2 and GHC 8.0 will cause
+this error. Stack also has the notion of a 'global project' located at
+`~/.stack/global-project/` and the `stack.yaml` for that project should be on
+the same LTS as the version of IHaskell installed to avoid this issue.

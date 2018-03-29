@@ -3,7 +3,7 @@ matrix:
     - language: nix
   fast_finish: true
   include:
-    - env: DISPLAY=true   USE_STACK_YAML="stack.yaml"     # GHC 8.0.2
+    - env: DISPLAY=true   USE_STACK_YAML="stack-8.0.yaml"     # GHC 8.0.2
       language: python
       # Test against different stack LTS versions.
 
@@ -45,8 +45,8 @@ matrix:
         - pip install -U pip
         - pip install -U setuptools
 
-          # Install nbconvert for testing the notebook
-        - pip install jupyter notebook nbconvert
+          # Install from requirements.txt
+        - pip install -r requirements.txt
 
       # This step takes the longest, and is what generates the Stack cache. 
       install:
@@ -82,7 +82,7 @@ matrix:
               # Images are rendered differently on different systems, so filter them out in the comparison
               diff <(grep -v image/png ~/ihaskell-out.ipynb) <(grep -v image/png notebooks/IHaskell.ipynb)
           fi
-    - env: DISPLAY=true   USE_STACK_YAML="stack-8.2.yaml"     # GHC 8.2.1
+    - env: DISPLAY=true   USE_STACK_YAML="stack.yaml"     # GHC 8.2.2
       language: python
       # Test against different stack LTS versions.
 
@@ -124,8 +124,8 @@ matrix:
         - pip install -U pip
         - pip install -U setuptools
 
-          # Install nbconvert for testing the notebook
-        - pip install jupyter notebook nbconvert
+          # Install from requirements.txt
+        - pip install -r requirements.txt
 
       # This step takes the longest, and is what generates the Stack cache. 
       install:
@@ -138,6 +138,85 @@ matrix:
 
         - stack setup
         - stack install gtk2hs-buildtools --fast
+        - stack build hmatrix --fast
+        - stack build --dependencies-only --fast
+
+      script:
+        - stack test --no-terminal --fast
+        - |
+          set -e
+          if $DISPLAY; then
+              TOP=$(pwd)
+              stack build --no-terminal --fast
+
+              # Ensure that ipython-kernel examples build successfully.
+              stack build ipython-kernel --flag ipython-kernel:examples --fast
+
+              # Ensure that IHaskell notebook remains unchanged.
+              # Run the notebook to regenerate the outputs, then compare the new notebook to the old one.
+              stack install --fast
+              stack exec -- ihaskell install --stack
+              stack exec -- jupyter nbconvert --to=notebook --execute --stdout notebooks/IHaskell.ipynb > ~/ihaskell-out.ipynb
+
+              # Images are rendered differently on different systems, so filter them out in the comparison
+              diff <(grep -v image/png ~/ihaskell-out.ipynb) <(grep -v image/png notebooks/IHaskell.ipynb)
+          fi
+    - env: DISPLAY=false   USE_STACK_YAML="stack-8.4.yaml"     # GHC 8.4.1
+      language: python
+      # Test against different stack LTS versions.
+
+      # Choose a lightweight base image; we provide our own build tools.
+      python: "3.6"
+
+      # Enable caching.
+      sudo: false
+
+      # Caching so the next build will be fast too.
+      # These caches are the same between resolvers, but this is fine, 
+      # as Stack differentiates between its resolvers.
+      cache:
+        directories:
+        - $HOME/.ghc
+        - $HOME/.cabal
+        - $HOME/.stack
+
+      # Enable packages we need.
+      # Not all packages are available – see before_install for from-source builds. 
+      addons:
+        apt:
+          packages:
+            - libmagic-dev     # magic
+            - libgmp-dev       # ghc
+            - libblas-dev      # hmatrix
+            - liblapack-dev    # hmatrix
+            - libcairo2-dev    # cairo
+            - libpango1.0-dev  # pango
+            - libzmq3-dev      # zmq
+
+      before_install:
+          # Download and unpack the stack executable
+        - export PATH=$HOME/.local/bin:$PATH
+        - mkdir -p ~/.local/bin
+        - curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+
+          # Upgrades to avoid later build problems
+        - pip install -U pip
+        - pip install -U setuptools
+
+          # Install from requirements.txt
+        - pip install -r requirements.txt
+
+      # This step takes the longest, and is what generates the Stack cache. 
+      install:
+        - |
+          # Used to avoid 'source and destination file are the same' error
+          mv $USE_STACK_YAML intermediate-stack.yaml
+          mv intermediate-stack.yaml stack.yaml
+
+          echo "apply-ghc-options: everything" >> stack.yaml
+
+        - stack setup
+        # - stack install gtk2hs-buildtools --fast
         - stack build hmatrix --fast
         - stack build --dependencies-only --fast
 
@@ -171,10 +250,11 @@ matrix:
         - export NIX_CONF_DIR=~
         - echo "binary-caches = http://128.199.234.106:3000" >> $NIX_CONF_DIR/nix.conf
         - echo "binary-cache-public-keys = 128.199.234.106:jzUyrIQHov5i6f94jQVriqPDLuPYlZPAsga3W3k+L8E=" >> $NIX_CONF_DIR/nix.conf
+        - nix-env -i curl jq
       script:
         - >
           nix-build
-          -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/a09358f9c01549ded8f7f9825b7b214eb148ac76.tar.gz
+          -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/$(curl "https://api.github.com/repos/NixOS/nixpkgs-channels/branches/nixos-17.09" | jq -r '.commit.sha').tar.gz
           $RELEASE_NIX
           --arg packages '(p: with p; [
             ihaskell-aeson
@@ -200,10 +280,11 @@ matrix:
         - export NIX_CONF_DIR=~
         - echo "binary-caches = http://128.199.234.106:3000" >> $NIX_CONF_DIR/nix.conf
         - echo "binary-cache-public-keys = 128.199.234.106:jzUyrIQHov5i6f94jQVriqPDLuPYlZPAsga3W3k+L8E=" >> $NIX_CONF_DIR/nix.conf
+        - nix-env -i curl jq
       script:
         - >
           nix-build
-          -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/a09358f9c01549ded8f7f9825b7b214eb148ac76.tar.gz
+          -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/$(curl "https://api.github.com/repos/NixOS/nixpkgs-channels/branches/nixos-17.09" | jq -r '.commit.sha').tar.gz
           $RELEASE_NIX
           --arg packages '(p: with p; [
             ihaskell-aeson
